@@ -6,57 +6,100 @@ import NewPost from "./componant/NewPost";
 import PostPage from "./componant/PostPage";
 import About from "./componant/About";
 import Missing from "./componant/Missing";
-
-import {  Route, Switch, useHistory } from "react-router-dom";
+import { format } from "date-fns";
+import { Route, Switch, useHistory } from "react-router-dom";
 import { useState, useEffect } from "react";
+import axios from "axios";
+
+const api = "http://localhost:3600/posts";
 
 function App() {
+  const [posts, setPosts] = useState([]);
 
-  const [posts, setPosts] = useState([
-    {
-      id: 1,
-      title: "Challenge: Go big or go home",
-      datetime: "July 01, 2021 11:17:36 AM",
-      body: "What’s better than people loving your app on iPhone? People loving your app on iPad and Mac, too! This challenge invites you to explore the ways you can expand your app’s presence in the Apple ecosystem. Explore prototyping your iPhone app for iPad, adding new desktop-class features to your iPad app, or bringing your app to macOS. Whatever it means to you, think big \n If you already have an iPad app, this challenge is a great opportunity to refine it. If your iPad app is already at the top of its game, explore bringing it to Mac with Mac Catalyst — and consider the differences in the iPad and Mac idioms. "
-    },
-    {
-      id: 2,
-      title: "Create ML",
-      datetime: "July 01, 2021 11:17:36 AM",
-      body: "The Create ML app lets you quickly build and train Core ML models right on your Mac with no code. The easy-to-use app interface and models available for training make the process easier than ever, so all you need to get started is your training data. You can even take control of the training process with features like snapshots and previewing to help you visualize model training and accuracy. Dive deeper and gain more control of model creation using the Create ML framework and Create ML Components."
-    },
-    {
-      id: 3,
-      title: "Access comprehensive services.",
-      datetime: "July 01, 2021 11:17:36 AM",
-      body: "Leverage Apple’s tightly integrated hardware, software, services, and capabilities to create useful and engaging experiences. Allow your users to subscribe to special content, experience your app in new ways using augmented reality, create intelligent features with on-device machine learning, and quickly purchase items within your app with Apple Pay, sign in to your app and website with their Apple ID, get things done with just their voice using Siri, and much more."
+  const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [postTitle, setPostTitle] = useState("");
+  const [postBody, setPostBody] = useState("");
+  const history = useHistory();
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await axios.get(api);
+        setPosts(response.data);
+      } catch (error) {
+        if (error.response) {
+          console.log(error.response.data);
+          console.log(error.response.status);
+          console.log(error.response.header);
+        } else {
+          console.log(`error : ${error.message}`);
+        }
+      }
+    };
+
+    fetchPosts();
+  }, []);
+
+  useEffect(() => {
+    const filteredResults = posts.filter(
+      (post) =>
+        post.body.toLowerCase().includes(search.toLowerCase()) ||
+        post.title.toLowerCase().includes(search.toLowerCase())
+    );
+
+    setSearchResults(filteredResults.reverse());
+  }, [posts, search]);
+
+  const handleSubmit = async(e) => {
+    e.preventDefault();
+    const id = posts.length ? posts[posts.length - 1].id + 1 : 1;
+    const datetime = format(new Date(), "MMMM dd, yyyy pp");
+    const newPost = { id, title: postTitle, datetime, body: postBody };
+    try {
+      const response =  await axios.post(api,newPost);
+      const allPosts = [...posts, response.data];
+      setPosts(allPosts);
+      setPostTitle("");
+      setPostBody("");
+      history.push("/");
+    } catch (err) {
+      console.log(`error : ${err.message}`);
     }
-  ])
+  };
 
-  
-  const [search, setSearch] = useState('');
-  // const [searchResults, setSearchResults] = useState([]);
-  // const [postTitle, setPostTitle] = useState('');
-  // const [postBody, setPostBody] = useState('');
-  // const history = useHistory();
-
-  const handleDelete = () => {
-
+  const handleDelete = async(id) => {
+    try{
+      // console.log(api + `/${id}`);
+      await axios.delete(api + `/${id}`)
+      const postsList = posts.filter((post) => post.id !== id);
+      setPosts(postsList);
+    }
+    catch(err){
+      console.log(`error : ${err.message}`);
+    }
+    history.push("/");
   };
 
   return (
     <div className="App">
-     <Header title="Somin's Blog" />
+      <Header title="React JS Blog" />
       <Nav search={search} setSearch={setSearch} />
       <Switch>
         <Route exact path="/">
-          <Home posts = {posts} />
+          <Home posts={searchResults} />
         </Route>
         <Route exact path="/post">
-          <NewPost/>
+          <NewPost
+            handleSubmit={handleSubmit}
+            postTitle={postTitle}
+            setPostTitle={setPostTitle}
+            postBody={postBody}
+            setPostBody={setPostBody}
+          />
         </Route>
         <Route path="/post/:id">
-          <PostPage  posts= {posts} handleDelete ={handleDelete} />
+          <PostPage posts={posts} handleDelete={handleDelete} />
         </Route>
         <Route path="/about" component={About} />
         <Route path="*" component={Missing} />
